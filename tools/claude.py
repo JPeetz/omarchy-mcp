@@ -8,7 +8,7 @@ def register(mcp):
     @mcp.tool()
     async def claude_execute(
         prompt: str,
-        cwd: str = "/home/jpeetz",
+        cwd: str | None = None,
         timeout: int = 300,
     ) -> str:
         """Execute a prompt with Claude Code CLI (YOLO mode,

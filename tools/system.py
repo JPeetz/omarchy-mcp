@@ -19,7 +19,7 @@ def register(mcp):
     @mcp.tool()
     async def system_run(
         command: str,
-        cwd: str = "/home/jpeetz",
+        cwd: str | None = None,
         timeout: int = 60,
     ) -> str:
         """Execute a shell command on Omarchy (whitelisted commands only).

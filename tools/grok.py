@@ -5,7 +5,7 @@ def register(mcp):
     @mcp.tool()
     async def grok_execute(
         prompt: str,
-        cwd: str = "/home/jpeetz",
+        cwd: str | None = None,
         timeout: int = 300,
     ) -> str:
         """Execute a prompt with Grok CLI (xAI) on Omarchy.

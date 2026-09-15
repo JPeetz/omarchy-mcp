@@ -11,7 +11,12 @@ def strip_ansi(text: str) -> str:
     return _ANSI_ESCAPE.sub("", text).strip()
 
 
-async def run_command_async(cmd: list[str], cwd: str = "/home/jpeetz",
+def default_home() -> str:
+    """User's home directory.  Override via OMARCHY_USER_HOME env var."""
+    return os.environ.get("OMARCHY_USER_HOME") or os.path.expanduser("~")
+
+
+async def run_command_async(cmd: list[str], cwd: str | None = None,
                             timeout: int = 300, env: dict | None = None,
                             stdin_data: bytes | None = None) -> dict:
     """Async subprocess runner using asyncio.create_subprocess_exec.
@@ -36,15 +41,14 @@ async def run_command_async(cmd: list[str], cwd: str = "/home/jpeetz",
                       else asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
-                cwd=cwd,
+                cwd=cwd or default_home(),
                 env=merged_env,
                 start_new_session=True,
             ),
             timeout=max(timeout, 10),
         )
     except (asyncio.TimeoutError, TimeoutError):
-        return _timeout_result(time.monotonic() - start, timeout,
-                               "spawn timed out")
+        return _timeout_result(time.monotonic() - start, timeout)
     except FileNotFoundError as e:
         return _error_result(time.monotonic() - start,
                              f"Command not found: {e}")
@@ -118,7 +122,7 @@ def _error_result(elapsed: float, msg: str) -> dict:
     }
 
 
-def run_command(cmd: list[str], cwd: str = "/home/jpeetz",
+def run_command(cmd: list[str], cwd: str | None = None,
                 timeout: int = 300, env: dict | None = None) -> dict:
     """Synchronous subprocess runner (used by system_run internally
     via asyncio.to_thread).  Kept for callers that do not have an event
@@ -133,7 +137,7 @@ def run_command(cmd: list[str], cwd: str = "/home/jpeetz",
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            cwd=cwd,
+            cwd=cwd or default_home(),
             env=merged_env,
             start_new_session=True,
         )

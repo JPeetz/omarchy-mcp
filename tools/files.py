@@ -1,23 +1,28 @@
 import os
 import json
+from executor import default_home
 
-# Allowed roots for file operations. A path must resolve to exactly one of
-# these directories, or a child thereof (separator boundary enforced).
-_ALLOWED_ROOTS = ["/home/jpeetz", "/tmp"]
+# Allowed roots for file operations.  Defaults to user home + /tmp.
+# Override via OMARCHY_FILE_ROOTS (colon-separated).
+def _allowed_roots() -> list[str]:
+    env = os.environ.get("OMARCHY_FILE_ROOTS", "")
+    if env:
+        return [p.strip() for p in env.split(":") if p.strip()]
+    return [default_home(), "/tmp"]
 
 
 def _check_path(path: str) -> str:
-    """Resolve *path* and check it's under one of *_ALLOWED_ROOTS*.
+    """Resolve *path* and check it's under one of the allowed roots.
     Returns the resolved path on success, or a JSON error string
-    starting with ``{\"error\"`` when the path is rejected."""
+    starting with ``{"error"`` when the path is rejected."""
     try:
         real_path = os.path.realpath(path)
     except (OSError, ValueError):
         return json.dumps({"error": f"cannot resolve path: {path}"})
-    for root in _ALLOWED_ROOTS:
+    for root in _allowed_roots():
         if real_path == root or real_path.startswith(root + "/"):
             return real_path
-    return json.dumps({"error": f"path must be under {_ALLOWED_ROOTS}"})
+    return json.dumps({"error": f"path must be under allowed roots"})
 
 
 def _is_error(checked: str) -> bool:
@@ -92,14 +97,14 @@ def register(mcp):
 
     @mcp.tool()
     async def file_list(
-        path: str = "/home/jpeetz",
+        path: str | None = None,
     ) -> str:
         """List files and directories at a path on Omarchy.
 
         Args:
-            path: Directory path to list
+            path: Directory path to list (default: user home)
         """
-        checked = _check_path(path)
+        checked = _check_path(path or default_home())
         if _is_error(checked):
             return checked  # error JSON
 

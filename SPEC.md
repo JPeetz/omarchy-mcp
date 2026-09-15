@@ -24,7 +24,7 @@ Before this server, dispatching tasks from Hermes Agent (Mac) to the Omarchy VM 
 5. Stripping ANSI escape codes with a 3-pass regex
 6. Manual timeout tuning per prompt size
 
-This pipeline had real costs: a **plaintext password embedded in skill files** (`sshpass -p 'Buddy-2019'` in ~15+ locations), **fragile heredoc quoting** that broke on complex prompts, **silent failures** on SSH timeout (empty output files), and **no streaming** for long-running tasks.
+This pipeline had real costs: a **plaintext password embedded in skill files** (`sshpass -p '…'` in ~15+ locations), **fragile heredoc quoting** that broke on complex prompts, **silent failures** on SSH timeout (empty output files), and **no streaming** for long-running tasks.
 
 ### 1.2 Solution
 

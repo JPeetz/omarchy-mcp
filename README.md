@@ -46,6 +46,8 @@ This server collapses that into authenticated, structured tool calls over Stream
 |------|-------------|
 | `claude_execute(prompt, cwd?, timeout?)` | Run Claude Code CLI (YOLO mode) with a prompt via stdin |
 | `codex_execute(prompt, cwd?, timeout?)` | Run Codex CLI with a prompt via stdin |
+| `hermes_execute(prompt, cwd?, timeout?)` | Run Hermes Agent with a prompt via stdin |
+| `grok_execute(prompt, cwd?, timeout?)` | Run Grok CLI (xAI) with a prompt |
 | `file_read(path, offset?, limit?)` | Read a file from the Omarchy filesystem |
 | `file_write(path, content, mode?)` | Write a file on the Omarchy filesystem |
 | `file_list(path?)` | List directory contents |

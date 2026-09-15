@@ -1,6 +1,27 @@
 import os
 import json
-import stat as stat_module
+
+# Allowed roots for file operations. A path must resolve to exactly one of
+# these directories, or a child thereof (separator boundary enforced).
+_ALLOWED_ROOTS = ["/home/jpeetz", "/tmp"]
+
+
+def _check_path(path: str) -> str:
+    """Resolve *path* and check it's under one of *_ALLOWED_ROOTS*.
+    Returns the resolved path on success, or a JSON error string
+    starting with ``{\"error\"`` when the path is rejected."""
+    try:
+        real_path = os.path.realpath(path)
+    except (OSError, ValueError):
+        return json.dumps({"error": f"cannot resolve path: {path}"})
+    for root in _ALLOWED_ROOTS:
+        if real_path == root or real_path.startswith(root + "/"):
+            return real_path
+    return json.dumps({"error": f"path must be under {_ALLOWED_ROOTS}"})
+
+
+def _is_error(checked: str) -> bool:
+    return checked.startswith("{")
 
 
 def register(mcp):
@@ -17,12 +38,12 @@ def register(mcp):
             offset: Starting line (0-indexed)
             limit: Maximum lines to return
         """
-        real_path = os.path.realpath(path)
-        if not real_path.startswith("/home/jpeetz") and not real_path.startswith("/tmp"):
-            return json.dumps({"error": "path must be under /home/jpeetz or /tmp"})
+        checked = _check_path(path)
+        if _is_error(checked):
+            return checked  # error JSON
 
         try:
-            with open(real_path, "r", encoding="utf-8", errors="replace") as f:
+            with open(checked, "r", encoding="utf-8", errors="replace") as f:
                 lines = f.readlines()
 
             total = len(lines)
@@ -56,16 +77,16 @@ def register(mcp):
             content: Content to write
             mode: 'overwrite' or 'append'
         """
-        real_path = os.path.realpath(path)
-        if not real_path.startswith("/home/jpeetz") and not real_path.startswith("/tmp"):
-            return json.dumps({"error": "path must be under /home/jpeetz or /tmp"})
+        checked = _check_path(path)
+        if _is_error(checked):
+            return checked  # error JSON
 
         try:
             write_mode = "a" if mode == "append" else "w"
-            os.makedirs(os.path.dirname(real_path), exist_ok=True)
-            with open(real_path, write_mode, encoding="utf-8") as f:
+            os.makedirs(os.path.dirname(checked), exist_ok=True)
+            with open(checked, write_mode, encoding="utf-8") as f:
                 f.write(content)
-            return json.dumps({"ok": True, "path": real_path, "mode": mode, "bytes": len(content)})
+            return json.dumps({"ok": True, "path": checked, "mode": mode, "bytes": len(content)})
         except Exception as e:
             return json.dumps({"error": str(e)})
 
@@ -78,12 +99,15 @@ def register(mcp):
         Args:
             path: Directory path to list
         """
-        real_path = os.path.realpath(path)
+        checked = _check_path(path)
+        if _is_error(checked):
+            return checked  # error JSON
+
         try:
-            entries = os.listdir(real_path)
+            entries = os.listdir(checked)
             result = []
             for name in sorted(entries):
-                full = os.path.join(real_path, name)
+                full = os.path.join(checked, name)
                 try:
                     st = os.stat(full)
                     result.append({

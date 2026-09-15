@@ -38,12 +38,23 @@ class BearerAuthMiddleware(base.BaseHTTPMiddleware):
 
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.environ.get("PORT", "8911"))
-    bind = os.environ.get("BIND", "0.0.0.0")
+    bind = os.environ.get("BIND", "127.0.0.1")
+    ssl_cert = os.environ.get("TLS_CERT", "")
+    ssl_key = os.environ.get("TLS_KEY", "")
+
+    kwargs = {}
+    scheme = "http"
+    if ssl_cert and ssl_key:
+        kwargs["ssl_certfile"] = ssl_cert
+        kwargs["ssl_keyfile"] = ssl_key
+        scheme = "https"
+
     app = mcp.streamable_http_app(
         streamable_http_path="/mcp",
         transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
     )
     app = BearerAuthMiddleware(app)
-    logger.info("Starting omarchy-mcp on %s:%s/mcp", bind, port)
-    uvicorn.run(app, host=bind, port=port, log_level="info")
+    logger.info("Starting omarchy-mcp on %s://%s:%s/mcp", scheme, bind, port)
+    uvicorn.run(app, host=bind, port=port, log_level="info", **kwargs)

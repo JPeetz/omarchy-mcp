@@ -51,10 +51,10 @@ def register(mcp):
                 "command": command,
             })
 
-        from executor import run_command
+        from executor import run_command_async
         # Run as a list (no shell) so shlex splitting is authoritative and
         # shell metacharacters in arguments are passed literally, not executed.
-        result = run_command(
+        result = await run_command_async(
             parts,
             cwd=cwd,
             timeout=min(max(timeout, 5), 300),

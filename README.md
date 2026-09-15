@@ -1,64 +1,44 @@
 # Omarchy MCP Server
 
-A purpose-built [Model Context Protocol](https://modelcontextprotocol.io/) server that runs on an Omarchy (Arch Linux) VM and exposes local AI agents and system tools as MCP tools — consumable by [Hermes Agent](https://github.com/NousResearch/hermes-agent) or any MCP client.
+A purpose-built [Model Context Protocol](https://modelcontextprotocol.io/) server that runs on a Linux VM and exposes local AI agents and system tools as MCP tools — consumable by [Hermes Agent](https://github.com/NousResearch/hermes-agent) or any MCP client.
 
-It replaces an SSH-based dispatch pipeline with a structured, authenticated MCP protocol — removing plaintext credentials from skill files, eliminating fragile heredoc quoting, and replacing ANSI-scraping with structured JSON-RPC results.
+Replaces SSH-based dispatch (fragile heredocs, ANSI scraping, plaintext passwords) with authenticated, structured MCP tool calls over Streamable HTTP.
 
-## Why
-
-Before this server, dispatching tasks from Hermes Agent (Mac) to the Omarchy VM required writing prompts to files, SCP-ing them over, SSH-ing to run `claude -p` or `codex exec`, SCP-ing results back, and stripping ANSI with a 3-pass regex. That pipeline had a plaintext password embedded in skill files, fragile heredoc quoting, silent failures on timeout, and no streaming.
-
-This server collapses that into authenticated, structured tool calls over Streamable HTTP.
-
-## Architecture
-
-```
-┌─────────────────────────────────────┐
-│  Machine A (Mac / control plane)    │
-│                                     │
-│  Hermes Agent                       │
-│  config.yaml:                       │
-│    mcp_servers:                     │
-│      omarchy:                       │
-│        url: "http://<vm>:8911/mcp"  │
-│        headers:                     │
-│          Authorization: Bearer <t>  │
-└─────────────────────┬───────────────┘
-                      │  Streamable HTTP
-┌─────────────────────▼───────────────┐
-│  Machine B (Omarchy VM / worker)    │
-│                                     │
-│  omarchy-mcp (systemd)              │
-│  FastMCP v2 + uvicorn, port 8911    │
-│                                     │
-│  Tools:                             │
-│  ├─ claude_execute()                │
-│  ├─ codex_execute()                 │
-│  ├─ file_read / file_write / list   │
-│  ├─ system_run() (whitelisted)      │
-│  └─ status()                        │
-└─────────────────────────────────────┘
-```
+---
 
 ## Tools
 
 | Tool | Description |
 |------|-------------|
-| `claude_execute(prompt, cwd?, timeout?)` | Run Claude Code CLI (YOLO mode) with a prompt via stdin |
-| `codex_execute(prompt, cwd?, timeout?)` | Run Codex CLI with a prompt via stdin |
-| `hermes_execute(prompt, cwd?, timeout?)` | Run Hermes Agent with a prompt via stdin |
-| `grok_execute(prompt, cwd?, timeout?)` | Run Grok CLI (xAI) with a prompt |
-| `file_read(path, offset?, limit?)` | Read a file from the Omarchy filesystem |
-| `file_write(path, content, mode?)` | Write a file on the Omarchy filesystem |
-| `file_list(path?)` | List directory contents |
-| `system_run(command, cwd?, timeout?)` | Run a whitelisted shell command (git, python3, ls, cat, ...) |
-| `status()` | VM health: uptime, memory, load, tool availability |
+| `claude_execute(prompt, cwd?, timeout?)` | Run [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) |
+| `codex_execute(prompt, cwd?, timeout?)` | Run [OpenAI Codex CLI](https://github.com/openai/codex) |
+| `hermes_execute(prompt, cwd?, timeout?)` | Run [Hermes Agent](https://github.com/NousResearch/hermes-agent) |
+| `grok_execute(prompt, cwd?, timeout?)` | Run [xAI Grok CLI](https://x.ai) |
+| `file_read(path, offset?, limit?)` | Read files on the remote VM |
+| `file_write(path, content, mode?)` | Write files on the remote VM |
+| `file_list(path?)` | List directories |
+| `system_run(command, cwd?, timeout?)` | Run whitelisted shell commands |
+| `status()` | VM health (uptime, memory, load, tool availability) |
 
-Full specifications in [SPEC.md](./SPEC.md).
+Each AI tool only appears in the tool list if its CLI binary is installed and on `$PATH`.
 
-## Quick Start
+---
 
-### 1. Clone and install
+## Requirements
+
+- **A Linux VM** — tested on Arch / Omarchy. Works on any distro with Python 3.11+
+- **Python 3.11+** with `mcp>=2.0.0`, `psutil`, `uvicorn`
+- **Optional — AI agent CLIs** on the VM (install at least one):
+  - [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)
+  - [Codex CLI](https://github.com/openai/codex)
+  - [Hermes Agent](https://github.com/NousResearch/hermes-agent)
+  - [xAI Grok CLI](https://x.ai)
+
+---
+
+## Deployment
+
+### 1. Clone & Install Dependencies
 
 ```bash
 git clone https://github.com/JPeetz/omarchy-mcp.git
@@ -66,70 +46,111 @@ cd omarchy-mcp
 pip install -r requirements.txt
 ```
 
-MCP SDK 2.x (`mcp>=2.0.0`, which bundles uvicorn/starlette) and `psutil` are required.
-
 ### 2. Configure
 
 ```bash
 cp .env.example .env
-# Generate a strong token:
+
+# Generate a strong bearer token:
 openssl rand -hex 32
-# Set OMARCHY_MCP_TOKEN in .env
+
+# Edit .env — set OMARCHY_MCP_TOKEN to the generated value.
+# Optionally set OMARCHY_USER_HOME if your home dir differs.
+# For LAN access: set BIND=0.0.0.0 and configure TLS (see .env.example).
 ```
 
-### 3. Run
+### 3. Start the Server
 
 ```bash
 python3 server.py
 ```
 
-Or install as a systemd service:
+The server starts on `http://127.0.0.1:8911/mcp` (loopback only) by default.
 
-```ini
-[Unit]
-Description=Omarchy MCP Server
-After=network.target
-
-[Service]
-Type=simple
-User=jpeetz
-WorkingDirectory=/path/to/omarchy-mcp
-EnvironmentFile=/path/to/omarchy-mcp/.env
-ExecStart=/usr/bin/python3 /path/to/omarchy-mcp/server.py
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-### 4. Connect Hermes Agent
+### 4. Verify Locally
 
 ```bash
-hermes config set mcp_servers.omarchy.url "http://<vm>:8911/mcp"
-hermes config set mcp_servers.omarchy.headers.Authorization "Bearer <token>"
+curl -s -X POST http://127.0.0.1:8911/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <your-token>' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2026-07-28","capabilities":{},"cientInfo":{"name":"test","version":"0.1"}}}'
+```
+
+Expected response starts with `event: message` followed by `data: {"jsonrpc":...,"result":...}`.
+
+### 5. Systemd Service (Production)
+
+```bash
+# Edit omarchy-mcp.service to match your user/paths, then:
+sudo cp omarchy-mcp.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now omarchy-mcp.service
+```
+
+The `ExecStart`, `WorkingDirectory`, `User`, and `EnvironmentFile` must match your system.
+
+### 6. Connect Hermes Agent
+
+On your desktop / control plane, add the server as an MCP connection:
+
+```bash
+hermes config set mcp_servers.omarchy.url "http://<vm-ip>:8911/mcp"
+hermes config set mcp_servers.omarchy.headers.Authorization "Bearer <your-token>"
+```
+
+Replace `<vm-ip>` with the VM's LAN IP and `<your-token>` with your token.
+
+Test:
+
+```bash
 hermes mcp test omarchy
 ```
 
-Then call the tools directly:
+Expected: `✓ Connected` and `✓ Tools discovered: 9`.
+
+Call tools:
 
 ```bash
-hermes -c "Call the omarchy status tool and show me the result"
+hermes -c "Cal the omarchy status tool and show me the result"
 ```
+
+---
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OMARCHY_MCP_TOKEN` | **Yes** | — | Bearer token for MCP auth |
+| `PORT`| No | `8911` | Server HTTP port |
+| `BIND` | No | `127.0.0.1` | Bind address. `0.0.0.0` for LAN (with TLS) |
+| `TLS_CERT` | No | —| Path to TLS certificate (enables HTTPS) |
+| `TLS_KEY` | No | — | Path to TLS key file |
+| `OMARCHY_USER_HOME` | No | `os.expanduser(~)` | User home for default working directory |
+| `OMARCHY_FILE_ROOTS` | No |`$HOME:/tmp` | Colon-separated allowedpaths for file tools |
+
+---
 
 ## Security
 
-- **Bearer token auth** — constant-time comparison on every request
-- **Token in `.env`** — never in skill files or session prompts
-- **Path validation** — `file_read`/`file_write` restricted to `/home/*` and `/tmp`
-- **Command whitelist** — `system_run` only allows pre-approved commands
-- **Firewall** — open only the MCP port on the VM's firewall
+1. **Bearer token auth** — every request requires `Authorization: Bearer <token>`. Constant-time comparison.
+2. **Loopback by default** — server binds to `127.0.0.1`; network exposure is opt-in.
+3. **TLS ready** — set `TLS_CERT`/`TLS_KEY` for encrypted transport.
+4. **Command whitelist** — `system_run` only allows pre-approved commands.
+5. **Path restriction** — file tools only access user home and `/tmp`.
+6. **Cancellation** — request cancellation kills the entire subprocess group.
 
-**Note:** This is a tool-level fence, not an OS-level one. The MCP server runs as the same OS user as the agents it drives. Treat it as equivalent to SSH access — use a strong token and run it behind a firewall or VPN when possible.
+---
 
-## Docker
+## Troubleshooting
 
-A `Dockerfile` is included. The container runs the MCP server; you may want to add your own `claude`/`codex` binaries via a custom image.
+| Symptom | Likely Cause | Fix |
+|---------|--------------|-----|
+| `Connection refused` | Server not running or wrong IP | Check `systemctl status` and `BIND` in `.env` |
+| `401 Unauthorized` | Token mismatch | Regenerate token, update both sides |
+| `claude_execute` not found | Claude Code not on VM | `which claude` — must be on `$PATH` |
+| `Command timed out` | Agent took longer than timeout | Increase `timeout` parameter |
+
+---
 
 ## License
 

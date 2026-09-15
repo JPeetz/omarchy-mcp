@@ -4,6 +4,7 @@ import json
 
 WHITELIST = [
     "git", "python3", "ls", "cat", "head", "tail", "grep", "which",
+    "hermes", "grok",
     "whoami", "hostname", "uname", "date", "pwd", "echo", "wc",
     "find", "du", "df", "ps", "uptime", "free",
 ]

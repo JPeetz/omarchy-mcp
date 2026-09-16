@@ -1,5 +1,8 @@
 # Omarchy MCP Server
 
+<img width="1536" height="1024" alt="pq719e" src="https://github.com/user-attachments/assets/b80c8d95-aa3d-4860-97e4-f31f7014d224" />
+
+
 A purpose-built [Model Context Protocol](https://modelcontextprotocol.io/) server that runs on a Linux VM and exposes local AI agents and system tools as MCP tools — consumable by [Hermes Agent](https://github.com/NousResearch/hermes-agent) or any MCP client.
 
 Replaces SSH-based dispatch (fragile heredocs, ANSI scraping, plaintext passwords) with authenticated, structured MCP tool calls over Streamable HTTP.
@@ -21,6 +24,9 @@ Replaces SSH-based dispatch (fragile heredocs, ANSI scraping, plaintext password
 | `status()` | VM health (uptime, memory, load, tool availability) |
 
 Each AI tool only appears in the tool list if its CLI binary is installed and on `$PATH`.
+
+<img width="1280" height="633" alt="j24i4k" src="https://github.com/user-attachments/assets/3ba63a5d-24db-4f1d-81e9-ec1a57e2ac7e" />
+
 
 ---
 
@@ -138,6 +144,9 @@ hermes -c "Cal the omarchy status tool and show me the result"
 4. **Command whitelist** — `system_run` only allows pre-approved commands.
 5. **Path restriction** — file tools only access user home and `/tmp`.
 6. **Cancellation** — request cancellation kills the entire subprocess group.
+
+   <img width="1536" height="1024" alt="vf2w6q" src="https://github.com/user-attachments/assets/cc7cd7ea-8d8f-486e-a2ec-86fd5bc6c7f7" />
+
 
 ---
 
